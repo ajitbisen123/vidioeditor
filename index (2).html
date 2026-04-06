@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<!-- ============================================================
+     META & TITLE
+     ============================================================ -->
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Aman — Video Editor</title>
+
+<!-- ============================================================
+     GOOGLE FONTS
+     ============================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Syne:wght@400;600;700;800&family=Syncopate:wght@400;700&family=DM+Mono:wght@300&display=swap" rel="stylesheet"/>
+
+<style>
+
+/* ============================================================
+   0. GLOBAL — CSS VARIABLES, RESET, BODY
+   ============================================================ */
+:root {
+  --bg:    #06080d;
+  --bg2:   #090c13;
+  --glass:  rgba(255,255,255,0.035);
+  --glass2: rgba(255,255,255,0.06);
+  --border:  rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --a1: #d4ff00;
+  --a2: #00e5ff;
+  --text:   #eef0f8;
+  --muted:  #505570;
+  --muted2: #7a7f96;
+  --fD: 'Anton',     sans-serif;
+  --fS: 'Syne',      sans-serif;
+  --fM: 'Syncopate', sans-serif;
+  --fC: 'DM Mono',   monospace;
+  --r: 14px;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html  { scroll-behavior: smooth; }
+body  { background: var(--bg); color: var(--text); font-family: var(--fS); overflow-x: hidden; cursor: none; }
+a     { text-decoration: none; color: inherit; }
+img   { display: block; max-width: 100%; }
+
+/* ============================================================
+   0a. SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar       { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--a1); border-radius: 10px; }
+
+/* ============================================================
+   0b. BACKGROUND EFFECTS (noise + grid)
+   ============================================================ */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: .5;
+}
+
+.g-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(212,255,0,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,255,0,.022) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+.g-bg::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 0%,  rgba(212,255,0,.07) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 80%,  rgba(0,229,255,.05) 0%, transparent 60%);
+}
+
+/* ============================================================
+   0c. CUSTOM CURSOR
+   ============================================================ */
+#cDot, #cRing {
+  position: fixed; pointer-events: none; z-index: 9999;
+  border-radius: 50%; transform: translate(-50%, -50%);
+}
+#cDot  { width: 6px; height: 6px; background: var(--a1); box-shadow: 0 0 10px var(--a1); }
+#cRing { width: 32px; height: 32px; border: 1.5px solid rgba(212,255,0,.4); transition: width .25s, height .25s, border-color .25s; }
+
+@media (pointer: coarse) { #cDot, #cRing { display: none; } body { cursor: auto; } }
+
+/* ============================================================
+   0d. SCROLL PROGRESS BAR
+   ============================================================ */
+#sProg {
+  position: fixed; top: 0; left: 0; height: 2px; z-index: 200;
+  width: 0; background: linear-gradient(90deg, var(--a1), var(--a2));
+  box-shadow: 0 0 8px var(--a1); transition: width .1s;
+}
+
+/* ============================================================
+   0e. SCROLL-REVEAL ANIMATION
+   ============================================================ */
+.rv  { opacity: 0; transform: translateY(34px); transition: opacity .75s ease, transform .75s ease; }
+.rv.vi { opacity: 1; transform: translateY(0); }
+
+/* ============================================================
+   0f. MAGNETIC ELEMENT
+   ============================================================ */
+.magnetic { transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1); display: inline-block; }
+
+/* ============================================================
+   0g. LAYOUT HELPERS
+   ============================================================ */
+.sec  { position: relative; z-index: 1; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 40px 48px; }
+@media (max-width: 860px) { .wrap { padding: 30px 24px; } }
+
+.sec-label {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--fC); font-size: .65rem; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--muted2); margin-bottom: 5px;
+}
+.sec-label::before { content: ''; width: 18px; height: 1px; background: var(--a1); }
+
+.sec-title {
+  font-family: var(--fD); font-size: clamp(2.6rem, 6vw, 5rem);
+  letter-spacing: 2px; line-height: .95; margin-bottom: 20px;
+}
+.sec-title em { font-family: 'Georgia', serif; font-style: italic; color: var(--a1); font-size: .92em; }
+
+/* ============================================================
+   0h. GLOBAL BUTTONS
+   ============================================================ */
+.btn-p {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; background: var(--a1); color: var(--bg);
+  font-family: var(--fM); font-size: .6rem; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  border-radius: 100px; border: none; cursor: pointer;
+  transition: transform .3s, box-shadow .3s;
+}
+.btn-p:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(212,255,0,.35); }
+
+.btn-s {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; background: var(--glass2); color: var(--text);
+  font-family: var(--fM); font-size: .6rem; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  border-radius: 100px; border: 1px solid var(--border2); cursor: pointer;
+  transition: border-color .3s, color .3s, transform .3s;
+}
+.btn-s:hover { border-color: var(--a2); color: var(--a2); transform: translateY(-3px); }
+
+
+/* ============================================================
+   1. NAVBAR
+   ============================================================ */
+#nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 5%;
+  background: rgba(5,7,10,0.7); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+  z-index: 9998; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.n-logo { font-family: var(--fD); font-size: 1.6rem; font-weight: 900; color: #d4ff00; letter-spacing: 2px; }
+.n-links { display: flex; list-style: none; gap: 35px; margin: 0; padding: 0; }
+.n-links a { color: #fff; font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; transition: color .3s; }
+.n-links a:hover { color: #d4ff00; }
+.n-cta {
+  background: #d4ff00; color: #000;
+  padding: 10px 20px; border-radius: 4px;
+  font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px;
+  transition: .3s transform, .3s box-shadow;
+}
+.n-cta:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(212,255,0,0.3); }
+
+/* Hamburger */
+.hbtn { display: none; flex-direction: column; gap: 6px; cursor: pointer; padding: 5px; z-index: 9999; }
+.hbtn span { width: 28px; height: 2px; background: #fff; transition: .3s; }
+
+/* Mobile nav drawer */
+.mob-nav {
+  position: fixed; top: 0; right: -100%; width: 280px; height: 100vh;
+  background: #05070a; border-left: 1px solid #222;
+  display: flex; flex-direction: column; padding: 80px 30px; gap: 25px;
+  transition: right .4s ease-in-out; z-index: 9999; box-shadow: -10px 0 30px rgba(0,0,0,.9);
+}
+.mob-nav.active { right: 0; }
+.mob-close { position: absolute; top: 25px; right: 25px; background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer; }
+.mob-nav a { color: #fff; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; transition: color .3s; }
+.mob-nav a:hover { color: #d4ff00; }
+
+@media (max-width: 860px) { .n-links, .n-cta { display: none; } .hbtn { display: flex; } }
+
+
+/* ============================================================
+   2. HERO
+   ============================================================ */
+#hero-section {
+  position: relative; padding: 100px 5% 20px;
+  display: flex; align-items: center; justify-content: center;
+  background: #05070a; overflow: hidden; color: #fff;
+}
+#hero-section::before {
+  content: ''; position: absolute; top: 30%; left: 15%;
+  width: 350px; height: 350px;
+  background: radial-gradient(circle, rgba(212,255,0,0.06) 0%, transparent 70%);
+  filter: blur(60px); z-index: 0;
+}
+
+.hero-container {
+  display: flex; flex-direction: row; align-items: center; justify-content: center;
+  gap: 100px; /* Dono columns ke beech ka gap */
+  max-width: 1150px; width: 100%; position: relative; z-index: 2; margin: 0 auto;
+}
+
+.hero-content { 
+  flex: 1; max-width: 500px; display: flex; flex-direction: column; gap: 10px; 
+  align-items: flex-start; /* Parent ko left align rakha hai */
+}
+
+.badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(212,255,0,0.1); border: 1px solid rgba(212,255,0,0.3);
+  border-radius: 50px; padding: 6px 15px;
+  font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #d4ff00; width: fit-content;
+}
+
+/* AMAN Text size chota kiya hua */
+.hero-name { 
+  font-size: clamp(3rem, 6vw, 6rem); 
+  font-weight: 900; line-height: .85; letter-spacing: -2px; margin: 15px 0; 
+}
+.n-white { color: #fff; text-shadow: 0 0 20px rgba(255,255,255,.2); }
+.n-sol   { color: #d4ff00; text-shadow: 0 0 30px rgba(212,255,0,.3); }
+
+.changing-text-wrapper { font-size: 1.8rem; font-weight: 700; color: #fff; height: 40px; margin-bottom: 5px; }
+#changing-word { color: #d4ff00; text-transform: uppercase; border-right: 3px solid #d4ff00; padding-right: 5px; }
+
+.hb-tag { font-size: 1.05rem; color: #aaa; line-height: 1.6; max-width: 450px; margin-bottom: 15px; }
+.hb-tag strong { color: #fff; }
+
+.stats-row { display: flex; gap: 40px; margin: 10px 0; border-left: 2px solid rgba(212,255,0,.5); padding-left: 20px; }
+.stat-n { font-size: 2.5rem; font-weight: 800; color: #fff; line-height: 1; display: block; margin-bottom: 4px; }
+.stat-l { font-size: 10px; letter-spacing: 2px; color: #777; text-transform: uppercase; }
+
+/* =========================================
+   HARDCODED LEFT ALIGN FIX FOR BUTTONS
+   ========================================= */
+.cta-btns { 
+  display: flex !important; 
+  gap: 15px !important; 
+  margin-top: 20px !important; 
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  justify-content: flex-start !important; /* Elements ko left me push karega */
+  align-items: center !important;
+  align-self: flex-start !important; /* Pure container ko flexbox me left align karega */
+  width: 100% !important;
+}
+
+.btn-p, .btn-s {
+  padding: 12px 30px; font-size: 12px; font-weight: bold; letter-spacing: 1px;
+  text-transform: uppercase; border-radius: 30px; text-decoration: none; transition: 0.3s;
+  display: inline-block;
+}
+.btn-p { background: #d4ff00; color: #000; border: 1px solid #d4ff00; }
+.btn-p:hover { background: #b8de00; }
+.btn-s { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.3); }
+.btn-s:hover { border-color: #fff; }
+
+/* Hero visual / orbit */
+.hero-visual { flex: 1; display: flex; justify-content: center; align-items: center; }
+.orbit-shell {
+  position: relative; width: clamp(320px, 40vw, 480px); height: clamp(320px, 40vw, 480px);
+  display: flex; align-items: center; justify-content: center;
+}
+
+
+
+/* 1. Parent Container (Circle Setup & Z-index Fix) */
+.prof-center.profile-image-container {
+  width: 140px; 
+  height: 140px;
+  border-radius: 50%; 
+  border: 2px solid rgba(212,255,0,.5);
+  background: linear-gradient(180deg, #111, #05070a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* Dhyan de: Ye face ko gol circle me rakhega */
+  box-shadow: 0 0 40px rgba(212,255,0,.1);
+  
+  position: relative; 
+  z-index: 30 !important; /* Photo ko sabse aage (top) par laane ke liye */
+}
+
+/* 2. Image Setup (Perfect Position & Zoom Fix) */
+.profile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; 
+  object-position: center top; /* Focus ko face par set karta hai */
+  
+  /* YAHI HAI WO MAGIC TRICK 👇 */
+  transform-origin: center top; /* Ye ensure karega ki zoom hone par sir upar se na kate */
+  
+  transform: scale(1.3); /* Zoom level 1.3 rakha hai taaki suit bhi dikhe */
+  transition: transform 0.3s ease;
+}
+
+/* Hover par thoda sa smooth zoom effect */
+.prof-center.profile-image-container:hover .profile-image {
+  transform: scale(1.4); 
+}
+/* Agar aap chahte ho ki mouse laane par image aur thodi zoom ho */
+.prof-center.profile-image-container:hover .profile-image {
+  transform: scale(1.5); /* Normal 1.4 hai, hover par 1.5 ho jayega */
+}
+.orbit-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,.06); animation: spin linear infinite; z-index: 15; }
+.or1 { width: 70%; height: 70%; animation-duration: 25s; border-color: rgba(212,255,0,.15); }
+.or2 { width: 100%; height: 100%; animation-duration: 40s; animation-direction: reverse; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.o-icon {
+  position: absolute; width: 44px; height: 44px;
+  background: #000; border: 1px solid rgba(255,255,255,.15);
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.8); animation: cspin linear infinite; z-index: 20;
+}
+.or1 .o-icon { animation-duration: 25s; }
+.or2 .o-icon { animation-duration: 40s; animation-direction: reverse; }
+@keyframes cspin { to { transform: rotate(-360deg); } }
+
+.prof-center {
+  width: 140px; height: 180px; border-radius: 70px;
+  border: 2px solid rgba(212,255,0,.5);
+  background: linear-gradient(180deg, #111, #05070a);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 5; box-shadow: 0 0 40px rgba(212,255,0,.1);
+}
+.prof-center span { font-weight: 900; color: #d4ff00; font-size: 1.5rem; letter-spacing: 2px; }
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+  .hero-container { flex-direction: column; text-align: center; gap: 50px; }
+  .hero-content { align-items: center; } /* Mobile me center better lagta hai */
+  .stats-row { border: none; padding: 0; flex-wrap: wrap; justify-content: center; gap: 20px; }
+  .orbit-shell { width: 380px; height: 380px; }
+  
+  /* Mobile me buttons center rakhne ke liye */
+  .cta-btns { 
+    justify-content: center !important; 
+    align-self: center !important; 
+  }
+}
+
+@media (max-width: 600px) {
+  #hero-section { padding: 90px 5% 10px; }
+  .hero-name { font-size: 3.5rem; }
+  .changing-text-wrapper { font-size: 1.4rem; }
+  .orbit-shell { width: 300px; height: 300px; }
+  .prof-center { width: 110px; height: 140px; }
+  .prof-center span { font-size: 1.2rem; }
+  .o-icon { width: 36px; height: 36px; }
+  .cta-btns { flex-direction: column !important; width: 100% !important; max-width: 300px; }
+}
+
+
+/* ============================================================
+   3. PORTFOLIO
+   ============================================================ */
+#portfolio { background: var(--bg2); padding: 20px 5%; }
+
+.port-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+}
+.pc {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden;
+  transition: transform .4s, border-color .4s, box-shadow .4s;
+  display: flex; flex-direction: column; text-decoration: none; color: inherit;
+}
+.pc:hover {
+  transform: translateY(-10px);
+  border-color: rgba(212,255,0,.4);
+  box-shadow: 0 30px 60px rgba(0,0,0,.5), 0 0 40px rgba(212,255,0,.08);
+}
+.pc-thumb {
+  width: 100%; aspect-ratio: 9/16; position: relative;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000;
+}
+.pc-video { position: absolute; top: -5%; left: -5%; width: 110%; height: 110%; pointer-events: none; border: none; }
+.pc-overlay { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.3) 0%, transparent 40%, rgba(0,0,0,.8) 100%); z-index: 1; }
+.pc-num { position: absolute; right: 14px; top: 12px; z-index: 2; font-family: var(--fC); font-size: .65rem; letter-spacing: 2px; color: rgba(255,255,255,.8); font-weight: bold; }
+.pc-dur { position: absolute; left: 12px; bottom: 10px; z-index: 2; font-family: var(--fC); font-size: .65rem; letter-spacing: 1px; color: #fff; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); padding: 4px 8px; border-radius: 4px; }
+
+.play {
+  position: relative; z-index: 2; width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.15); border: 1.5px solid rgba(255,255,255,.5);
+  backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center;
+  transition: transform .3s, background .3s, border-color .3s;
+}
+.pc:hover .play { transform: scale(1.15); background: #d4ff00; border-color: #d4ff00; }
+.play svg { fill: white; margin-left: 3px; transition: fill .3s; width: 14px; height: 14px; }
+.pc:hover .play svg { fill: #000; }
+
+.pc-body { padding: 18px; flex-grow: 1; display: flex; flex-direction: column; }
+.pc-tag  { font-family: var(--fC); font-size: .6rem; letter-spacing: 2px; text-transform: uppercase; color: #d4ff00; margin-bottom: 6px; font-weight: bold; }
+.pc-name { font-family: var(--fD); font-size: 1.3rem; letter-spacing: 1px; margin-bottom: 8px; font-weight: 800; line-height: 1.1; }
+.pc-desc { font-size: .8rem; color: #aaa; line-height: 1.5; margin-bottom: auto; }
+
+.pc-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); font-size: .65rem; color: #888; }
+.pc-foot strong { color: #fff; }
+.pcdot { width: 4px; height: 4px; border-radius: 50%; background: #444; }
+
+@media (max-width: 1100px) { .port-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 860px)  { .port-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 550px)  { .port-grid { grid-template-columns: 1fr; max-width: 380px; margin: 0 auto; } }
+
+
+/* ============================================================
+   4. EXPERIENCE (TIMELINE)
+   ============================================================ */
+#experience { background: var(--bg); padding: 20px 5%; overflow: hidden; }
+
+.tl { position: relative; max-width: 1050px; margin: 0 auto; }
+.tl::after {
+  content: ''; position: absolute; width: 2px;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,.15) 5%, rgba(255,255,255,.15) 95%, transparent);
+  top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+}
+
+.tl-item {
+  padding: 10px 50px; position: relative; width: 50%;
+  opacity: 0; transform: translateY(50px);
+  animation: fadeInUp .8s ease forwards;
+}
+@keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+.tl-item:nth-child(odd)  { left: 0; text-align: right; }
+.tl-item:nth-child(odd) .tl-tags { justify-content: flex-end; }
+.tl-item:nth-child(even) { left: 50%; text-align: left; top: 60px; margin-bottom: 60px; }
+.tl-item:nth-child(even) .tl-tags { justify-content: flex-start; }
+
+.tl-item::after {
+  content: ''; position: absolute; width: 18px; height: 18px;
+  background: #d4ff00; border-radius: 50%; top: 15px;
+  box-shadow: 0 0 20px rgba(212,255,0,.9); z-index: 2; transition: transform .3s;
+}
+.tl-item:hover::after { transform: scale(1.3); }
+.tl-item:nth-child(odd)::after  { right: -9px; }
+.tl-item:nth-child(even)::after { left: -9px; }
+
+.tl-date { font-family: var(--fC); font-size: .75rem; letter-spacing: 2.5px; text-transform: uppercase; color: #d4ff00; margin-bottom: 8px; font-weight: 800; }
+.tl-role { font-family: var(--fD); font-size: clamp(1.6rem, 2.5vw, 2.2rem); letter-spacing: 1px; margin-bottom: 5px; color: #fff; font-weight: 900; }
+.tl-co   { font-size: .95rem; color: #e0e0e0; margin-bottom: 12px; font-weight: 600; }
+.tl-desc { font-size: .9rem; color: #ccc; line-height: 1.6; }
+
+.tl-tags { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+.tl-tag  {
+  font-size: .65rem; letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 6px 14px; border-radius: 100px; border: 1px solid rgba(255,255,255,.25);
+  color: #fff; background: rgba(255,255,255,.05); transition: .3s;
+}
+.tl-tag:hover { background: #d4ff00; color: #000; border-color: #d4ff00; }
+
+@media (max-width: 900px) {
+  .tl::after { left: 24px; transform: none; }
+  .tl-item { width: 100% !important; padding: 0 0 30px 60px !important; text-align: left !important; left: 0 !important; top: 0 !important; margin-bottom: 0 !important; }
+  .tl-item::after { left: 15px !important; right: auto !important; top: 0; }
+  .tl-item:nth-child(odd) .tl-tags,
+  .tl-item:nth-child(even) .tl-tags { justify-content: flex-start; }
+}
+
+
+/* ============================================================
+   5. EDUCATION
+   ============================================================ */
+#education { background: var(--bg2); padding: 20px 5%; }
+
+.edu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.edu-c {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 30px; position: relative; overflow: hidden;
+  transition: border-color .3s, transform .3s, box-shadow .3s; text-align: center;
+}
+.edu-c::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, #d4ff00, transparent);
+  opacity: 0; transition: opacity .3s;
+}
+.edu-c:hover { border-color: rgba(212,255,0,.3); transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 20px rgba(212,255,0,.05); }
+.edu-c:hover::before { opacity: 1; }
+
+.edu-yr   { font-family: var(--fC); font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; color: #d4ff00; margin-bottom: 12px; font-weight: bold; }
+.edu-deg  { font-family: var(--fD); font-size: clamp(1.2rem, 2.5vw, 1.6rem); letter-spacing: 1px; margin-bottom: 8px; color: #fff; font-weight: 800; }
+.edu-inst { font-size: .9rem; color: #ccc; line-height: 1.4; }
+.edu-ico  { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 6rem; opacity: .03; z-index: 0; pointer-events: none; }
+.edu-yr, .edu-deg, .edu-inst { position: relative; z-index: 2; }
+
+@media (max-width: 768px) { .edu-grid { grid-template-columns: 1fr; } .edu-c { padding: 25px 20px; } }
+
+
+/* ============================================================
+   6. TOOLS
+   ============================================================ */
+#tools { background: var(--bg); padding: 20px 5%; text-align: center; }
+
+.tools-pyramid { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.t-row { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+
+.tc {
+  background: var(--glass); border: 1px solid var(--border); border-radius: 18px;
+  padding: 22px 14px; width: 135px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  transition: transform .4s, border-color .4s, box-shadow .4s;
+  opacity: 0; transform: translateY(40px); animation: fadeUp .6s ease forwards;
+}
+.tc:hover { transform: translateY(-10px); z-index: 10; }
+
+.tc[data-g="purple"]:hover { border-color: rgba(148,0,211,.5);  box-shadow: 0 20px 40px rgba(148,0,211,.2); }
+.tc[data-g="red"]:hover    { border-color: rgba(255,60,110,.5);  box-shadow: 0 20px 40px rgba(255,60,110,.2); }
+.tc[data-g="lime"]:hover   { border-color: rgba(212,255,0,.5);   box-shadow: 0 20px 40px rgba(212,255,0,.2); }
+.tc[data-g="blue"]:hover   { border-color: rgba(30,150,255,.5);  box-shadow: 0 20px 40px rgba(30,150,255,.2); }
+.tc[data-g="orange"]:hover { border-color: rgba(255,140,0,.5);   box-shadow: 0 20px 40px rgba(255,140,0,.2); }
+
+.ti { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,.6); }
+.tn { font-weight: 800; font-size: .8rem; text-align: center; color: #fff; line-height: 1.1; }
+.ts { font-family: sans-serif; font-size: .65rem; color: #999; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+.ti svg { width: 30px; height: 30px; }
+
+@media (max-width: 1024px) { .tc { width: 120px; padding: 18px 10px; } .t-row { gap: 15px; } }
+@media (max-width: 768px)  { .tools-pyramid { flex-direction: row; flex-wrap: wrap; justify-content: center; } .t-row { display: contents; } .tc { width: calc(33.33% - 15px); min-width: 100px; max-width: 140px; } }
+@media (max-width: 480px)  { .tc { width: calc(50% - 15px); } }
+
+
+/* ============================================================
+   7. CTA BANNER
+   ============================================================ */
+#cta {
+  background: #05070a; position: relative; overflow: hidden;
+  padding: 40px 5%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+}
+#cta::before {
+  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 80vw; height: 80vw; max-width: 800px; max-height: 800px;
+  background: radial-gradient(circle, rgba(212,255,0,.05) 0%, transparent 60%);
+  z-index: 0; pointer-events: none;
+}
+.cta-wrap { position: relative; z-index: 2; max-width: 900px; width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+.cta-title {
+  font-family: var(--fD); font-size: clamp(3rem, 8vw, 6.5rem); font-weight: 900;
+  letter-spacing: -2px; line-height: .9; margin-bottom: 20px; text-transform: uppercase;
+}
+.gt {
+  background: linear-gradient(90deg, #fff, #d4ff00, #a1cc00, #fff);
+  background-size: 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; animation: gs 4s linear infinite; display: inline-block; padding-bottom: 5px;
+}
+@keyframes gs { to { background-position: 200% center; } }
+
+.cta-sub { font-size: 1.1rem; color: #aaa; margin: 0 auto 35px; max-width: 500px; line-height: 1.6; }
+
+.cta-btns { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-bottom: 40px; }
+
+.cta-stats-bar {
+  display: flex; justify-content: center; align-items: center; gap: 50px;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+  padding: 25px 60px; border-radius: 24px;
+  backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+  box-shadow: 0 20px 40px rgba(0,0,0,.5); flex-wrap: wrap;
+}
+.stat-item { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.cta-num   { font-family: var(--fD); font-size: 3rem; font-weight: 900; color: #fff; line-height: 1; }
+.cta-num.highlight { color: #d4ff00; }
+.cta-nl    { font-family: var(--fC); font-size: .65rem; letter-spacing: 2px; text-transform: uppercase; color: #888; }
+
+@media (max-width: 768px) {
+  #cta { padding: 40px 5%; }
+  .cta-title { font-size: 4rem; }
+  .cta-stats-bar { flex-direction: column; gap: 30px; padding: 30px 40px; width: 100%; max-width: 300px; }
+  .cta-btns { flex-direction: column; width: 100%; max-width: 300px; }
+  .hide-mobile { display: none; }
+}
+@media (max-width: 480px) { .cta-title { font-size: 3.2rem; } .cta-sub { font-size: 1rem; } }
+
+
+/* ============================================================
+   8. CONTACT
+   ============================================================ */
+#contact { padding: 60px 5%; background: var(--bg2); border-top: 1px solid var(--border); }
+
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; max-width: 1200px; margin: 0 auto; }
+
+.c-title { font-size: clamp(3.5rem, 7vw, 6.5rem); font-family: var(--fD); line-height: .9; text-transform: uppercase; color: #fff; margin-top: 10px; }
+.c-title span { color: var(--a1); }
+.c-desc  { font-size: 1.1rem; color: var(--muted2); margin-top: 20px; max-width: 400px; line-height: 1.6; }
+
+.big-email {
+  display: inline-block; font-size: clamp(1.8rem, 4vw, 3rem);
+  font-family: var(--fD); color: #fff; margin-bottom: 30px;
+  text-decoration: none; border-bottom: 3px solid var(--a1); padding-bottom: 5px; transition: color .3s;
+}
+.big-email:hover { color: var(--a1); }
+
+.soc-pills { display: flex; flex-wrap: wrap; gap: 15px; }
+.soc-pill  {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 24px; background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.1); border-radius: 100px;
+  font-weight: 600; font-size: .9rem; transition: .3s; text-decoration: none; color: #fff;
+}
+.soc-pill:hover { background: var(--a1); color: #000; border-color: var(--a1); transform: translateY(-3px); }
+.soc-pill svg { width: 18px; height: 18px; fill: currentColor; }
+
+@media (max-width: 900px) {
+  .contact-grid { grid-template-columns: 1fr; text-align: left; gap: 40px; }
+  .c-title { font-size: 4rem; }
+  .big-email { font-size: 2rem; }
+}
+
+
+/* ============================================================
+   9. FOOTER
+   ============================================================ */
+footer {
+  border-top: 1px solid var(--border); padding: 22px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: relative; z-index: 1; flex-wrap: wrap; gap: 10px;
+}
+.fl { font-family: var(--fM); font-size: .95rem; letter-spacing: 5px; color: var(--a1); }
+.fc { font-family: var(--fC); font-size: .62rem; color: var(--muted); letter-spacing: 1px; }
+.fb { display: flex; align-items: center; gap: 6px; font-family: var(--fC); font-size: .62rem; color: var(--muted); transition: color .3s; }
+.fb:hover { color: var(--a1); }
+
+@media (max-width: 860px) { footer { padding: 18px 24px; } }
+
+</style>
+</head>
+
+<body>
+
+<!-- ============================================================
+     CURSOR + GRID BG + PROGRESS BAR
+     ============================================================ -->
+<div id="cDot"></div>
+<div id="cRing"></div>
+<div class="g-bg"></div>
+<div id="sProg"></div>
+
+
+<!-- ============================================================
+     1. NAVBAR
+     ============================================================ -->
+<nav id="nav">
+  <a href="#hero-section" class="n-logo">AMAN</a>
+
+  <ul class="n-links">
+    <li><a href="#portfolio">Work</a></li>
+    <li><a href="#experience">Experience</a></li>
+    <li><a href="#education">Education</a></li>
+    <li><a href="#tools">Tools</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+
+  <a href="#contact" class="n-cta magnetic">Hire Me</a>
+
+  <div class="hbtn" id="hbtn">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
+
+<!-- Mobile Nav Drawer -->
+<div class="mob-nav" id="mobNav">
+  <button class="mob-close" id="mobClose">✕</button>
+  <a href="#portfolio"   class="mob-link">Work</a>
+  <a href="#experience"  class="mob-link">Experience</a>
+  <a href="#education"   class="mob-link">Education</a>
+  <a href="#tools"       class="mob-link">Tools</a>
+  <a href="#contact"     class="mob-link">Contact</a>
+</div>
+
+
+<!-- ============================================================
+     2. HERO
+     ============================================================ -->
+<section id="hero-section">
+  <div class="hero-container">
+
+    <div class="hero-content">
+      <div class="badge">● Available for Projects</div>
+
+      <h1 class="hero-name">
+        <span class="n-white">AM</span><span class="n-sol">AN</span>
+      </h1>
+
+      <div class="changing-text-wrapper">
+        I am a <span id="changing-word">Video Editor</span>
+      </div>
+
+      <p class="hb-tag">
+        Crafting <strong>cinematic stories</strong> that move people — frame by frame, cut by cut.
+        Expert in high-impact video production.
+      </p>
+
+      <div class="stats-row">
+        <div><span class="stat-n">200+</span><span class="stat-l">Videos Edited</span></div>
+        <div><span class="stat-n">5M+</span><span class="stat-l">Total Views</span></div>
+        <div><span class="stat-n">4+ Yrs</span><span class="stat-l">Experience</span></div>
+      </div>
+
+      <div class="cta-btns">
+        <a href="#portfolio" class="btn-p magnetic">My Work</a>
+        <a href="#contact"   class="btn-s magnetic">Contact</a>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="orbit-shell">
+
+        <div class="orbit-ring or1">
+          <div class="o-icon" style="top:-22px;left:50%;margin-left:-22px;">
+            <svg width="28" height="28" viewBox="0 0 100 100"><rect width="100" height="100" rx="15" fill="#00005C"/><text x="50" y="68" font-size="52" text-anchor="middle" fill="#EAAA00" font-family="Arial,sans-serif" font-weight="bold">Pr</text></svg>
+          </div>
+          <div class="o-icon" style="bottom:-22px;left:50%;margin-left:-22px;">
+            <svg width="28" height="28" viewBox="0 0 100 100"><rect width="100" height="100" rx="15" fill="#00005C"/><text x="50" y="68" font-size="52" text-anchor="middle" fill="#9999FF" font-family="Arial,sans-serif" font-weight="bold">Ae</text></svg>
+          </div>
+          <div class="o-icon" style="left:-22px;top:50%;margin-top:-22px;">
+            <svg width="24" height="24" viewBox="0 0 100 100"><rect width="100" height="100" rx="15" fill="#000"/><polygon points="20,50 50,20 80,50 50,80" fill="none" stroke="#FFF" stroke-width="8"/><polygon points="35,50 50,35 65,50 50,65" fill="#FFF"/></svg>
+          </div>
+        </div>
+
+        <div class="orbit-ring or2">
+          <div class="o-icon" style="top:-22px;left:50%;margin-left:-22px;">
+            <svg width="26" height="26" viewBox="0 0 100 100"><rect width="100" height="100" rx="15" fill="#111"/><circle cx="50" cy="50" r="30" fill="none" stroke="#FF5722" stroke-width="12"/><circle cx="50" cy="50" r="10" fill="#4CAF50"/><circle cx="35" cy="35" r="5" fill="#03A9F4"/></svg>
+          </div>
+          <div class="o-icon" style="bottom:-22px;left:50%;margin-left:-22px;">
+            <svg width="28" height="28" viewBox="0 0 100 100"><rect width="100" height="100" rx="15" fill="#001E36"/><text x="50" y="68" font-size="52" text-anchor="middle" fill="#31A8FF" font-family="Arial,sans-serif" font-weight="bold">Ps</text></svg>
+          </div>
+          <div class="o-icon" style="right:-22px;top:50%;margin-top:-22px;">
+            <svg width="26" height="26" viewBox="0 0 100 100"><rect width="100" height="100" rx="15" fill="#222"/><rect x="25" y="40" width="50" height="40" fill="#555"/><polygon points="25,40 75,40 65,20 35,20" fill="#888"/><line x1="35" y1="20" x2="25" y2="40" stroke="#FFF" stroke-width="4"/><line x1="55" y1="20" x2="45" y2="40" stroke="#FFF" stroke-width="4"/></svg>
+          </div>
+          <div class="o-icon" style="left:-22px;top:50%;margin-top:-22px;">
+            <svg width="26" height="26" viewBox="0 0 100 100"><rect width="100" height="100" rx="15" fill="#FF0000"/><polygon points="40,30 40,70 70,50" fill="#FFF"/></svg>
+          </div>
+        </div>
+
+        <div class="prof-center profile-image-container">
+          <img src="ajit 3.png" alt="Aman's Portrait" class="profile-image">
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     3. PORTFOLIO
+     ============================================================ -->
+<section id="portfolio" class="sec">
+  <div class="wrap" style="max-width:1300px;">
+    <p class="sec-label rv" style="color:#d4ff00;letter-spacing:2px;font-size:12px;text-transform:uppercase;margin-bottom:5px;">Selected Work</p>
+    <h2 class="sec-title rv" style="font-size:3.5rem;font-weight:900;margin-top:0;margin-bottom:20px;">POPULAR <em style="font-style:italic;color:#d4ff00;">Edits</em></h2>
+
+    <div class="port-grid">
+
+      <!-- Card 01 -->
+      <a href="https://www.youtube.com/shorts/0acKXTDy5bA" target="_blank" class="pc rv magnetic">
+        <div class="pc-thumb">
+          <iframe class="pc-video" src="https://www.youtube.com/embed/0acKXTDy5bA?autoplay=1&mute=1&loop=1&playlist=0acKXTDy5bA&controls=0&showinfo=0&rel=0&playsinline=1" allow="autoplay; fullscreen" tabindex="-1"></iframe>
+          <div class="pc-overlay"></div>
+          <span class="pc-num">01/04</span>
+          <span class="pc-dur">3:42</span>
+          <div class="play"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
+        </div>
+        <div class="pc-body">
+          <p class="pc-tag">Brand Commercial</p>
+          <h3 class="pc-name">URBAN PULSE</h3>
+          <p class="pc-desc">Cinematic brand film for a streetwear label — punchy cuts, neo-noir grading, custom motion type.</p>
+        </div>
+        <div class="pc-foot"><strong>2M+ Views</strong><div class="pcdot"></div><span>Premiere Pro</span></div>
+      </a>
+
+      <!-- Card 02 -->
+      <a href="https://www.youtube.com/shorts/MUyOiFRa90E" target="_blank" class="pc rv magnetic">
+        <div class="pc-thumb">
+          <iframe class="pc-video" src="https://www.youtube.com/embed/MUyOiFRa90E?autoplay=1&mute=1&loop=1&playlist=MUyOiFRa90E&controls=0&showinfo=0&rel=0&playsinline=1" allow="autoplay; fullscreen" tabindex="-1"></iframe>
+          <div class="pc-overlay"></div>
+          <span class="pc-num">02/04</span>
+          <span class="pc-dur">4:18</span>
+          <div class="play"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
+        </div>
+        <div class="pc-body">
+          <p class="pc-tag">Music Video</p>
+          <h3 class="pc-name">NEON NIGHTS</h3>
+          <p class="pc-desc">Immersive MV blending VFX layers, custom LUTs and a hypnotic neo-synthwave palette.</p>
+        </div>
+        <div class="pc-foot"><strong>850K+ Views</strong><div class="pcdot"></div><span>DaVinci Resolve</span></div>
+      </a>
+
+      <!-- Card 03 -->
+      <a href="https://www.youtube.com/shorts/_peC_cAmmxE" target="_blank" class="pc rv magnetic">
+        <div class="pc-thumb">
+          <iframe class="pc-video" src="https://www.youtube.com/embed/_peC_cAmmxE?autoplay=1&mute=1&loop=1&playlist=_peC_cAmmxE&controls=0&showinfo=0&rel=0&playsinline=1" allow="autoplay; fullscreen" tabindex="-1"></iframe>
+          <div class="pc-overlay"></div>
+          <span class="pc-num">03/04</span>
+          <span class="pc-dur">12:05</span>
+          <div class="play"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
+        </div>
+        <div class="pc-body">
+          <p class="pc-tag">Documentary</p>
+          <h3 class="pc-name">SILENT CITY</h3>
+          <p class="pc-desc">Award-shortlisted short doc exploring urban solitude through ambient pacing and evocative sound design.</p>
+        </div>
+        <div class="pc-foot"><strong>1.2M+ Views</strong><div class="pcdot"></div><span>After Effects</span></div>
+      </a>
+
+      <!-- Card 04 -->
+      <a href="https://www.youtube.com/shorts/WCTSp9SM9eU" target="_blank" class="pc rv magnetic">
+        <div class="pc-thumb">
+          <iframe class="pc-video" src="https://www.youtube.com/embed/WCTSp9SM9eU?autoplay=1&mute=1&loop=1&playlist=WCTSp9SM9eU&controls=0&showinfo=0&rel=0&playsinline=1" allow="autoplay; fullscreen" tabindex="-1"></iframe>
+          <div class="pc-overlay"></div>
+          <span class="pc-num">04/04</span>
+          <span class="pc-dur">1:30</span>
+          <div class="play"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
+        </div>
+        <div class="pc-body">
+          <p class="pc-tag">Short Form</p>
+          <h3 class="pc-name">HYPED REELS</h3>
+          <p class="pc-desc">Fast-paced, high-retention vertical edits designed to go viral. Snappy captions and transitions.</p>
+        </div>
+        <div class="pc-foot"><strong>3M+ Views</strong><div class="pcdot"></div><span>CapCut</span></div>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     4. EXPERIENCE
+     ============================================================ -->
+<section id="experience" class="sec">
+  <div class="wrap" style="max-width:1200px;">
+    <p class="sec-label rv">Career Highlights</p>
+    <h2 class="sec-title rv">WORK <em>Experience</em></h2>
+
+    <div class="tl">
+
+      <div class="tl-item rv" style="animation-delay:.1s;">
+        <p class="tl-date">Jan 2024 — Present</p>
+        <h3 class="tl-role">Senior Video Editor</h3>
+        <p class="tl-co">CreativeCore Studios · Mumbai</p>
+        <p class="tl-desc">Leading the post-production pipeline for high-budget brand commercials and documentaries. Managing a team of junior editors, coordinating with motion graphic artists.</p>
+        <div class="tl-tags">
+          <span class="tl-tag">Premiere Pro</span>
+          <span class="tl-tag">After Effects</span>
+          <span class="tl-tag">Color Grading</span>
+          <span class="tl-tag">Team Lead</span>
+        </div>
+      </div>
+
+      <div class="tl-item rv" style="animation-delay:.3s;">
+        <p class="tl-date">Jan 2023 — Dec 2023</p>
+        <h3 class="tl-role">Viral Content Strategist</h3>
+        <p class="tl-co">Creator & Brand Consulting · Remote</p>
+        <p class="tl-desc">Consulted and edited for 5 major YouTube channels. Analyzed audience retention graphs to craft hyper-engaging hooks, dynamic subtitles, and fast-paced storytelling.</p>
+        <div class="tl-tags">
+          <span class="tl-tag">YouTube Strategy</span>
+          <span class="tl-tag">CapCut Pro</span>
+          <span class="tl-tag">Retention Focus</span>
+        </div>
+      </div>
+
+      <div class="tl-item rv" style="animation-delay:.5s;">
+        <p class="tl-date">Jun 2021 — Dec 2022</p>
+        <h3 class="tl-role">Video Editor</h3>
+        <p class="tl-co">Pixelframe Media · Indore</p>
+        <p class="tl-desc">Produced over 300+ short-form vertical videos (Reels/Shorts) and multi-cam podcast edits. Handled audio sweetening, basic VFX, and tight deadlines.</p>
+        <div class="tl-tags">
+          <span class="tl-tag">DaVinci Resolve</span>
+          <span class="tl-tag">Social Media Reels</span>
+          <span class="tl-tag">Podcasts</span>
+        </div>
+      </div>
+
+      <div class="tl-item rv" style="animation-delay:.7s;">
+        <p class="tl-date">2020 — 2021</p>
+        <h3 class="tl-role">Freelance Editor</h3>
+        <p class="tl-co">Self-employed</p>
+        <p class="tl-desc">Started the journey by building a strong local client base. Edited wedding highlight films, local ad campaigns, and gaming montages.</p>
+        <div class="tl-tags">
+          <span class="tl-tag">Freelance</span>
+          <span class="tl-tag">Wedding Films</span>
+          <span class="tl-tag">Storytelling</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     5. EDUCATION
+     ============================================================ -->
+<section id="education" class="sec">
+  <div class="wrap" style="max-width:1000px;">
+    <p class="sec-label rv">Background</p>
+    <h2 class="sec-title rv">EDUC<em>ation</em></h2>
+
+    <div class="edu-grid">
+      <div class="edu-c rv">
+        <div class="edu-ico">🎓</div>
+        <p class="edu-yr">2020 — 2023</p>
+        <h3 class="edu-deg">B.A. in Multimedia & Mass Comm.</h3>
+        <p class="edu-inst">Mumbai University, Maharashtra<br>Focused on Film Studies & Visual Communication</p>
+      </div>
+      <div class="edu-c rv" style="transition-delay:.1s;">
+        <div class="edu-ico">🎬</div>
+        <p class="edu-yr">2021 — 2022</p>
+        <h3 class="edu-deg">Diploma in Video Editing & VFX</h3>
+        <p class="edu-inst">Arena Animation, India<br>Specialized in Post-Production Workflows</p>
+      </div>
+      <div class="edu-c rv" style="transition-delay:.2s;">
+        <div class="edu-ico">🏅</div>
+        <p class="edu-yr">2022</p>
+        <h3 class="edu-deg">Adobe Certified Professional</h3>
+        <p class="edu-inst">Adobe Inc.<br>Certified in Premiere Pro & After Effects</p>
+      </div>
+      <div class="edu-c rv" style="transition-delay:.3s;">
+        <div class="edu-ico">🏫</div>
+        <p class="edu-yr">2018 — 2020</p>
+        <h3 class="edu-deg">Higher Secondary (12th CBSE)</h3>
+        <p class="edu-inst">Delhi Public School (DPS)<br>Completed schooling with distinction</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     6. TOOLS
+     ============================================================ -->
+<section id="tools" class="sec">
+  <div class="wrap" style="max-width:1400px;">
+    <p class="sec-label rv">Arsenal</p>
+    <h2 class="sec-title rv">MY <em>Tools</em></h2>
+
+    <div class="tools-pyramid">
+
+      <!-- Row 1 — Primary NLEs & Core Apps -->
+      <div class="t-row">
+        <div class="tc rv magnetic" data-g="purple" style="animation-delay:.1s;"><div class="ti" style="background:linear-gradient(135deg,#2C0A6B,#4a1cc0)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="50" text-anchor="middle" fill="#9999FF" font-family="Arial,serif" font-weight="bold">Pr</text></svg></div><div class="tn">Premiere Pro</div><div class="ts">Primary NLE</div></div>
+        <div class="tc rv magnetic" data-g="purple" style="animation-delay:.2s;"><div class="ti" style="background:linear-gradient(135deg,#06004d,#1a0a6e)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="50" text-anchor="middle" fill="#9999FF" font-family="Arial,serif" font-weight="bold">Ae</text></svg></div><div class="tn">After Effects</div><div class="ts">Motion & VFX</div></div>
+        <div class="tc rv magnetic" data-g="red"    style="animation-delay:.3s;"><div class="ti" style="background:#1a1a1a;border:1px solid rgba(255,69,0,.3)"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="28" fill="none" stroke="#FF4500" stroke-width="8"/><circle cx="50" cy="50" r="10" fill="#FF4500"/></svg></div><div class="tn">DaVinci Resolve</div><div class="ts">Color Grading</div></div>
+        <div class="tc rv magnetic" data-g="orange" style="animation-delay:.4s;"><div class="ti" style="background:linear-gradient(135deg,#111,#333)"><svg viewBox="0 0 100 100"><rect x="25" y="40" width="50" height="40" fill="#555"/><polygon points="25,40 75,40 65,20 35,20" fill="#888"/></svg></div><div class="tn">Final Cut Pro</div><div class="ts">Mac Editor</div></div>
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:.5s;"><div class="ti" style="background:linear-gradient(135deg,#1a1a1a,#000)"><svg viewBox="0 0 100 100"><polygon points="35,50 50,35 65,50 50,65" fill="#FFF"/></svg></div><div class="tn">CapCut PC</div><div class="ts">Viral Shorts</div></div>
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:.6s;"><div class="ti" style="background:linear-gradient(135deg,#001a4d,#003399)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="50" text-anchor="middle" fill="#99ccff" font-family="Arial,serif" font-weight="bold">Me</text></svg></div><div class="tn">Media Encoder</div><div class="ts">Rendering</div></div>
+        <div class="tc rv magnetic" data-g="lime"   style="animation-delay:.7s;"><div class="ti" style="background:linear-gradient(135deg,#004d33,#009966)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="50" text-anchor="middle" fill="#99ffcc" font-family="Arial,serif" font-weight="bold">Au</text></svg></div><div class="tn">Audition</div><div class="ts">Audio Mix</div></div>
+      </div>
+
+      <!-- Row 2 — Design & 3D -->
+      <div class="t-row">
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:.8s;"><div class="ti" style="background:linear-gradient(135deg,#001D34,#003f78)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#31A8FF" font-family="Arial,serif" font-weight="bold">Ps</text></svg></div><div class="tn">Photoshop</div><div class="ts">Thumbnails</div></div>
+        <div class="tc rv magnetic" data-g="orange" style="animation-delay:.9s;"><div class="ti" style="background:linear-gradient(135deg,#331a00,#663300)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#ff9933" font-family="Arial,serif" font-weight="bold">Ai</text></svg></div><div class="tn">Illustrator</div><div class="ts">Vectors</div></div>
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:1.0s;"><div class="ti" style="background:linear-gradient(135deg,#002b33,#006680)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#66ccff" font-family="Arial,serif" font-weight="bold">Lr</text></svg></div><div class="tn">Lightroom</div><div class="ts">Photo Edit</div></div>
+        <div class="tc rv magnetic" data-g="lime"   style="animation-delay:1.1s;"><div class="ti" style="background:linear-gradient(135deg,#7D2AE7,#9b4ef0)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="54" text-anchor="middle" fill="white" font-family="Arial,serif" font-weight="bold">C</text></svg></div><div class="tn">Canva</div><div class="ts">Quick Assets</div></div>
+        <div class="tc rv magnetic" data-g="orange" style="animation-delay:1.2s;"><div class="ti" style="background:linear-gradient(135deg,#e65c00,#ff8533)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="50" text-anchor="middle" fill="white" font-family="Arial,serif" font-weight="bold">Bl</text></svg></div><div class="tn">Blender</div><div class="ts">3D Modeling</div></div>
+        <div class="tc rv magnetic" data-g="purple" style="animation-delay:1.3s;"><div class="ti" style="background:linear-gradient(135deg,#222,#444)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="40" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">C4D</text></svg></div><div class="tn">Cinema 4D</div><div class="ts">3D Motion</div></div>
+      </div>
+
+      <!-- Row 3 — Audio, Assets & Delivery -->
+      <div class="t-row">
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:1.4s;"><div class="ti" style="background:linear-gradient(135deg,#111,#333)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="40" text-anchor="middle" fill="#ccc" font-family="Arial,serif" font-weight="bold">OBS</text></svg></div><div class="tn">OBS Studio</div><div class="ts">Recording</div></div>
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:1.5s;"><div class="ti" style="background:linear-gradient(135deg,#003366,#005c99)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="36" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">Aud</text></svg></div><div class="tn">Audacity</div><div class="ts">Clean Audio</div></div>
+        <div class="tc rv magnetic" data-g="red"    style="animation-delay:1.6s;"><div class="ti" style="background:linear-gradient(135deg,#4d0000,#990000)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">ES</text></svg></div><div class="tn">Epidemic Sound</div><div class="ts">Music Lib</div></div>
+        <div class="tc rv magnetic" data-g="lime"   style="animation-delay:1.7s;"><div class="ti" style="background:linear-gradient(135deg,#4d6600,#88b300)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="50" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">Ev</text></svg></div><div class="tn">Envato</div><div class="ts">Stock Assets</div></div>
+        <div class="tc rv magnetic" data-g="purple" style="animation-delay:1.8s;"><div class="ti" style="background:linear-gradient(135deg,#1a0033,#400080)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">Fr</text></svg></div><div class="tn">Frame.io</div><div class="ts">Client Review</div></div>
+      </div>
+
+      <!-- Row 4 — AI Tools -->
+      <div class="t-row">
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:1.9s;"><div class="ti" style="background:linear-gradient(135deg,#001a33,#004080)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="38" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">Tpz</text></svg></div><div class="tn">Topaz Video AI</div><div class="ts">Upscaling</div></div>
+        <div class="tc rv magnetic" data-g="purple" style="animation-delay:2.0s;"><div class="ti" style="background:linear-gradient(135deg,#222,#444)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">Mj</text></svg></div><div class="tn">Midjourney</div><div class="ts">AI Gen</div></div>
+        <div class="tc rv magnetic" data-g="lime"   style="animation-delay:2.1s;"><div class="ti" style="background:linear-gradient(135deg,#004d33,#009966)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="40" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">GPT</text></svg></div><div class="tn">ChatGPT</div><div class="ts">Scripting</div></div>
+        <div class="tc rv magnetic" data-g="orange" style="animation-delay:2.2s;"><div class="ti" style="background:linear-gradient(135deg,#111,#333)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">El</text></svg></div><div class="tn">ElevenLabs</div><div class="ts">AI Voice</div></div>
+      </div>
+
+      <!-- Row 5 — Productivity -->
+      <div class="t-row">
+        <div class="tc rv magnetic" data-g="blue"   style="animation-delay:2.3s;"><div class="ti" style="background:linear-gradient(135deg,#fff,#eee)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="50" text-anchor="middle" fill="#000" font-family="Arial,serif" font-weight="bold">N</text></svg></div><div class="tn">Notion</div><div class="ts">Workspace</div></div>
+        <div class="tc rv magnetic" data-g="orange" style="animation-delay:2.4s;"><div class="ti" style="background:linear-gradient(135deg,#111,#333)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">Fg</text></svg></div><div class="tn">Figma</div><div class="ts">Layouts</div></div>
+        <div class="tc rv magnetic" data-g="lime"   style="animation-delay:2.5s;"><div class="ti" style="background:linear-gradient(135deg,#003300,#008000)"><svg viewBox="0 0 100 100"><text x="50" y="67" font-size="46" text-anchor="middle" fill="#fff" font-family="Arial,serif" font-weight="bold">Gd</text></svg></div><div class="tn">Google Drive</div><div class="ts">Cloud Sync</div></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     7. CTA BANNER
+     ============================================================ -->
+<section id="cta" class="sec">
+  <div class="cta-wrap">
+    <div class="rv">
+      <h2 class="cta-title">LET'S CREATE<br><span class="gt">SOMETHING</span><br>AMAZING</h2>
+      <p class="cta-sub">Brand film, music video, or viral reel — I bring your vision to life with precision and cinematic flair. Let's make your next project unforgettable.</p>
+      <div class="cta-btns">
+        <a href="#contact"   class="btn-p magnetic">Hire Me →</a>
+        <a href="#portfolio" class="btn-s magnetic">View Work</a>
+      </div>
+    </div>
+
+    <div class="cta-stats-bar rv" style="transition-delay:.2s;">
+      <div class="stat-item">
+        <div class="cta-num highlight">100%</div>
+        <div class="cta-nl">Client Satisfaction</div>
+      </div>
+      <div style="width:1px;height:40px;background:rgba(255,255,255,.1);" class="hide-mobile"></div>
+      <div class="stat-item">
+        <div class="cta-num">24hr</div>
+        <div class="cta-nl">Avg. Response Time</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     8. CONTACT
+     ============================================================ -->
+<section id="contact" class="sec">
+  <div class="wrap" style="padding:20px 0;max-width:1200px;">
+    <div class="contact-grid">
+
+      <!-- Left: Headline -->
+      <div class="rv">
+        <p class="sec-label">Let's Connect</p>
+        <h2 class="c-title">SAY <br><span>HELLO.</span></h2>
+        <p class="c-desc">Have a project, collab idea, or just want to chat about video? I'm always open to discussing new cinematic ventures.</p>
+      </div>
+
+      <!-- Right: Links -->
+      <div class="rv" style="transition-delay:.2s;">
+        <p style="color:#777;text-transform:uppercase;letter-spacing:2px;font-size:.8rem;margin-bottom:10px;">Drop me a line</p>
+
+        <a href="mailto:aman@example.com" class="big-email magnetic">aman@example.com</a>
+
+        <p style="color:#777;text-transform:uppercase;letter-spacing:2px;font-size:.8rem;margin-bottom:15px;margin-top:10px;">Or find me here</p>
+
+        <div class="soc-pills">
+          <a href="https://instagram.com" target="_blank" class="soc-pill magnetic">
+            <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+            Instagram
+          </a>
+          <a href="https://wa.me/919999999999" target="_blank" class="soc-pill magnetic">
+            <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0 0 20.885 3.488"/></svg>
+            WhatsApp
+          </a>
+          <a href="https://linkedin.com" target="_blank" class="soc-pill magnetic">
+            <svg viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            LinkedIn
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================
+     9. FOOTER
+     ============================================================ -->
+<footer>
+  <span class="fl">AMAN</span>
+  <span class="fc">© 2026 Aman · All rights reserved.</span>
+  <a href="#hero-section" class="fb magnetic">Top ↑</a>
+</footer>
+
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+/* ----------------------------------------------------------
+   1. CUSTOM CURSOR
+   ---------------------------------------------------------- */
+const cD = document.getElementById('cDot');
+const cR = document.getElementById('cRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+
+if (window.matchMedia('(pointer:fine)').matches) {
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cD.style.left = mx + 'px';
+    cD.style.top  = my + 'px';
+  });
+
+  (function loop() {
+    rx += (mx - rx) * .13;
+    ry += (my - ry) * .13;
+    cR.style.left = rx + 'px';
+    cR.style.top  = ry + 'px';
+    requestAnimationFrame(loop);
+  })();
+
+  document.querySelectorAll('a, button, .pc, .tc, .edu-c, .soc-pill, .big-email').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      cR.style.width       = '50px';
+      cR.style.height      = '50px';
+      cR.style.borderColor = 'rgba(212,255,0,.7)';
+    });
+    el.addEventListener('mouseleave', () => {
+      cR.style.width       = '32px';
+      cR.style.height      = '32px';
+      cR.style.borderColor = 'rgba(212,255,0,.4)';
+    });
+  });
+}
+
+/* ----------------------------------------------------------
+   2. MAGNETIC BUTTON EFFECT
+   ---------------------------------------------------------- */
+document.querySelectorAll('.magnetic').forEach(btn => {
+  btn.addEventListener('mousemove', e => {
+    const rect = btn.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width  / 2;
+    const y = e.clientY - rect.top  - rect.height / 2;
+    btn.style.transform = `translate(${x * 0.3}px, ${y * 0.3}px)`;
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.transform = 'translate(0px, 0px)';
+  });
+});
+
+/* ----------------------------------------------------------
+   3. SCROLL PROGRESS BAR + NAV SHRINK
+   ---------------------------------------------------------- */
+const sp  = document.getElementById('sProg');
+const nav = document.getElementById('nav');
+
+window.addEventListener('scroll', () => {
+  const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+  sp.style.width     = pct + '%';
+  nav.style.padding  = window.scrollY > 60 ? '10px 48px' : '10px 5%';
+}, { passive: true });
+
+/* ----------------------------------------------------------
+   4. SCROLL-REVEAL (IntersectionObserver)
+   ---------------------------------------------------------- */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('vi'); });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.rv').forEach(el => io.observe(el));
+
+/* ----------------------------------------------------------
+   5. ANIMATED HERO KEYWORDS
+   ---------------------------------------------------------- */
+const kws = [
+  { t: 'Editor',      c: '#d4ff00' },
+  { t: 'Storyteller', c: '#00e5ff' },
+  { t: 'Colorist',    c: '#ff3c6e' },
+  { t: 'Creator',     c: '#b06cff' },
+  { t: 'Director',    c: '#ff9500' },
+];
+let ki = 0;
+const kwEl = document.getElementById('changing-word');
+
+if (kwEl) {
+  kwEl.style.cssText = 'transition:opacity .4s,transform .4s;color:' + kws[0].c;
+  setInterval(() => {
+    kwEl.style.opacity   = '0';
+    kwEl.style.transform = 'translateY(10px)';
+    setTimeout(() => {
+      ki = (ki + 1) % kws.length;
+      kwEl.textContent     = kws[ki].t;
+      kwEl.style.color     = kws[ki].c;
+      kwEl.style.opacity   = '1';
+      kwEl.style.transform = 'translateY(0)';
+    }, 420);
+  }, 2400);
+}
+
+/* ----------------------------------------------------------
+   6. MOBILE NAV TOGGLE
+   ---------------------------------------------------------- */
+const hbtn    = document.getElementById('hbtn');
+const mobNav  = document.getElementById('mobNav');
+const mobClose = document.getElementById('mobClose');
+
+hbtn.addEventListener('click', () => mobNav.classList.toggle('active'));
+mobClose.addEventListener('click', () => mobNav.classList.remove('active'));
+
+document.querySelectorAll('.mob-link').forEach(link => {
+  link.addEventListener('click', () => mobNav.classList.remove('active'));
+});
+</script>
+
+</body>
+</html>
